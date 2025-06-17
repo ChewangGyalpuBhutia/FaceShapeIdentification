@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Face Shape Detector</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body
+    class="bg-gradient-to-br from-blue-100 via-white to-purple-100 min-h-screen flex flex-col items-center justify-center">
+    <div class="bg-white/90 shadow-2xl rounded-3xl p-10 w-full max-w-lg mt-10 border border-blue-100">
+        <h1 class="text-3xl font-extrabold mb-2 text-center text-blue-700 tracking-tight">Face Shape Detector</h1>
+        <p class="text-center text-gray-500 mb-6">Upload your photo to predict your face shape!</p>
+        <form id="upload-form" class="flex flex-col gap-4" enctype="multipart/form-data">
+            <label
+                class="flex flex-col items-center px-4 py-6 bg-blue-50 rounded-lg shadow-inner cursor-pointer hover:bg-blue-100 transition">
+                <svg class="w-12 h-12 text-blue-400 mb-2" fill="none" stroke="currentColor" stroke-width="2"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M3 15a4 4 0 004 4h10a4 4 0 004-4M7 10V7a5 5 0 0110 0v3"></path>
+                </svg>
+                <span class="text-blue-600 font-semibold">Choose an image</span>
+                <input id="file-input" type="file" name="file" accept="image/*" required class="hidden" />
+            </label>
+            <div id="preview-container" class="flex justify-center mt-2">
+                <img id="img-preview" src="" alt="Image Preview"
+                    class="rounded-xl shadow-md max-h-56 hidden border-2 border-blue-200" />
+            </div>
+            <button type="submit"
+                class="bg-gradient-to-r from-blue-500 to-purple-500 text-white py-2 rounded-xl font-semibold shadow-lg hover:from-blue-600 hover:to-purple-600 transition text-lg mt-2">Predict
+                Face Shape</button>
+        </form>
+        <div id="result" class="mt-8 text-center"></div>
+    </div>
+    <footer class="mt-8 text-gray-400 text-sm text-center">
+        &copy; 2025 Face Shape Detector &middot; Powered by FastAPI &amp; Tailwind CSS
+    </footer>
+    <script>
+        // Image preview logic
+        const fileInput = document.getElementById('file-input');
+        const imgPreview = document.getElementById('img-preview');
+        const previewContainer = document.getElementById('preview-container');
+        fileInput.addEventListener('change', function () {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    imgPreview.src = e.target.result;
+                    imgPreview.classList.remove('hidden');
+                }
+                reader.readAsDataURL(file);
+            } else {
+                imgPreview.src = '';
+                imgPreview.classList.add('hidden');
+            }
+        });
+
+        // Prediction logic
+        const form = document.getElementById('upload-form');
+        const resultDiv = document.getElementById('result');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            resultDiv.innerHTML = '<span class="text-gray-500 animate-pulse">Predicting...</span>';
+            const formData = new FormData(form);
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="mt-4">
+                            <span class="text-2xl font-bold text-green-600">Prediction: ${data.predicted_class}</span><br>
+                            <span class="text-gray-700 text-lg">Confidence: ${(data.confidence * 100).toFixed(2)}%</span>
+                        </div>
+                        <div class="mt-4 text-left mx-auto max-w-xs">
+                            <span class="font-medium text-gray-700">All Predictions:</span>
+                            <ul class="list-disc ml-6 mt-1 text-gray-600">
+                                ${Object.entries(data.all_predictions).map(([k, v]) =>
+                        `<li><span class="font-semibold">${k}:</span> ${(v * 100).toFixed(2)}%</li>`
+                    ).join('')}
+                            </ul>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<span class="text-red-600">${data.error || 'Prediction failed.'}</span>`;
+                }
+            } catch (err) {
+                resultDiv.innerHTML = `<span class="text-red-600">Error: ${err.message}</span>`;
+            }
+        });
+    </script>
+</body>
+
+</html>
