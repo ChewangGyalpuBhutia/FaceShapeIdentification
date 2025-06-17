@@ -8,13 +8,26 @@ from tensorflow.keras.applications.efficientnet import preprocess_input
 import numpy as np
 import io
 import traceback
+import os
 
 app = FastAPI()
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+# Ensure static and templates directories exist
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+static_dir = os.path.join(BASE_DIR, "static")
+templates_dir = os.path.join(BASE_DIR, "templates")
 
-model = load_model("face_shape_model.keras")
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+templates = Jinja2Templates(directory=templates_dir)
+
+# Load model at startup and log success/failure
+try:
+    model_path = os.path.join(BASE_DIR, "face_shape_model.keras")
+    model = load_model(model_path)
+    print("Model loaded successfully.")
+except Exception as e:
+    print("Failed to load model:", e)
+    model = None
 
 class_names = ["oval", "rectangular", "round", "square"]
 
@@ -41,12 +54,17 @@ async def predict(file: UploadFile = File(...)):
             status_code=400, content={"error": "Only image files are allowed"}
         )
 
+    if model is None:
+        return JSONResponse(
+            status_code=500, content={"error": "Model not loaded on server."}
+        )
+
     try:
         contents = await file.read()
         processed_img = preprocess_image(contents)
 
         predictions = model.predict(processed_img)
-        pred_class = np.argmax(predictions[0])
+        pred_class = int(np.argmax(predictions[0]))
         confidence = float(np.max(predictions[0]))
 
         return {
@@ -63,7 +81,3 @@ async def predict(file: UploadFile = File(...)):
         return JSONResponse(
             status_code=500, content={"error": f"An error occurred: {str(e)}"}
         )
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
